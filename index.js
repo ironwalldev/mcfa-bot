@@ -4,7 +4,6 @@ const app = express();
 
 app.get("/", (req, res) => res.send("Bot is alive!"));
 
-// Railway uses process.env.PORT (not 3000)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🌐 Web server running on port ${PORT}`));
 // -----------------------------------
@@ -31,12 +30,11 @@ const TOKEN = process.env.TOKEN;
 const PREFIX = "?";
 const REQUIRED_INVITES = 2;
 
-// ENV CHANNELS & ROLES
+// ENV IDs
 const PUBLIC_MCFA_CHANNEL = process.env.MCFA_CHANNEL_ID;
 const PRIVATE_STOCK_CHANNEL = process.env.PRIVATE_STOCK_CHANNEL_ID;
 const SCREENSHOT_APPROVAL_CHANNEL = process.env.SCREENSHOT_APPROVAL_CHANNEL_ID;
 const STAFF_LOG_CHANNEL = process.env.STAFF_PRIVATE_CHANNEL_ID;
-const APPROVE_ROLE_ID = process.env.APPROVE_ROLE_ID;
 
 // FILE
 const MCFA_FILE = path.join(__dirname, "mcfa.json");
@@ -49,18 +47,17 @@ function saveStock(data) {
     fs.writeFileSync(MCFA_FILE, JSON.stringify(data, null, 2));
 }
 
-// BUTTON COOLDOWN COLLECTION
+// Cooldown
 const buttonCooldown = new Collection();
 
-// CLIENT
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildInvites,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.DirectMessages
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.MessageContent
     ],
     partials: [Partials.Channel, Partials.Message]
 });
@@ -77,7 +74,7 @@ async function getInviteUsesForUser(guild, userId) {
         invites.forEach(inv => {
             if (inv.inviter && inv.inviter.id === userId) total += inv.uses ?? 0;
         });
-        return total || 0;
+        return total;
     } catch {
         return 0;
     }
@@ -90,7 +87,7 @@ function getMaxClaims(invites) {
     return Math.floor(invites / REQUIRED_INVITES);
 }
 
-// STOCK LOGGING
+// Update stock embed
 async function logToStock(item) {
     try {
         const ch = await client.channels.fetch(PRIVATE_STOCK_CHANNEL);
@@ -121,7 +118,11 @@ async function logToStock(item) {
     }
 }
 
+
+// ============================
 // MESSAGE HANDLER
+// ============================
+
 client.on("messageCreate", async msg => {
     if (!msg.guild || msg.author.bot) return;
     if (!msg.content.startsWith(PREFIX)) return;
@@ -173,54 +174,46 @@ client.on("messageCreate", async msg => {
         });
     }
 
-    // SETUPMCFA – Old Readable Style
-if (cmd === "setupmcfa") {
-    if (!msg.member.permissions.has(PermissionsBitField.Flags.Administrator))
-        return msg.reply({ content: "❌ Admin only." });
+    // SETUPMCFA (unchanged)
+    if (cmd === "setupmcfa") {
+        if (!msg.member.permissions.has(PermissionsBitField.Flags.Administrator))
+            return msg.reply({ content: "❌ Admin only." });
 
-    const embed = new EmbedBuilder()
-        .setColor(0x5865f2)
-        .setTitle("🌌 MCFA Premium Access System")
-        .setDescription(
-            "**Welcome to MCFA Auto Distribution**\n\n" +
-            "### 🔥 Requirements\n" +
-            `• **${REQUIRED_INVITES} invites = 1 MCFA account**\n` +
-            "• Subscribe to our YouTube channel & upload screenshot\n\n" +
-            "### 📥 Claim Steps\n" +
-            "1. Press **Get MCFA** below\n" +
-            "2. Bot will DM you\n" +
-            "3. Upload your subscription screenshot\n" +
-            "4. Wait for staff approval\n\n" +
-            "### 🤖 Bot Handles\n" +
-            "• Invite checking\n" +
-            "• Screenshot verification\n" +
-            "• Stock management\n" +
-            "• Account delivery"
-        )
-        .setThumbnail(client.user.displayAvatarURL())
-        .setFooter({ text: "Made by IronWall" })
-        .setTimestamp();
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle("🌌 MCFA Premium Access System")
+            .setDescription(
+                "**Welcome to MCFA Auto Distribution**\n\n" +
+                "### 🔥 Requirements\n" +
+                `• **${REQUIRED_INVITES} invites = 1 MCFA account**\n` +
+                "• Subscribe to our YouTube channel & upload screenshot\n\n" +
+                "### 📥 Claim Steps\n" +
+                "1. Press **Get MCFA** below\n" +
+                "2. Bot will DM you\n" +
+                "3. Upload your subscription screenshot\n" +
+                "4. Wait for staff approval\n\n" +
+                "### 🤖 Bot Handles\n" +
+                "• Invite checking\n" +
+                "• Screenshot verification\n" +
+                "• Stock management\n" +
+                "• Account delivery"
+            )
+            .setThumbnail(client.user.displayAvatarURL())
+            .setFooter({ text: "Made by IronWall" })
+            .setTimestamp();
 
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId("get_mcfa")
-            .setLabel("🚀 Get MCFA")
-            .setStyle(ButtonStyle.Primary)
-    );
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId("get_mcfa")
+                .setLabel("🚀 Get MCFA")
+                .setStyle(ButtonStyle.Primary)
+        );
 
-    const channel = await client.channels.fetch(PUBLIC_MCFA_CHANNEL);
-    await channel.send({ embeds: [embed], components: [row] });
+        const channel = await client.channels.fetch(PUBLIC_MCFA_CHANNEL);
+        await channel.send({ embeds: [embed], components: [row] });
 
-    return msg.reply({
-        embeds: [
-            new EmbedBuilder()
-                .setColor(0x00ff00)
-                .setDescription("✅ MCFA embed posted successfully.")
-                .setFooter({ text: "Made by IronWall" })
-        ]
-    });
-}
-
+        return msg.reply({ content: "✅ Posted MCFA embed." });
+    }
 
     // ADDMCFA
     if (cmd === "addmcfa") {
@@ -266,23 +259,27 @@ if (cmd === "setupmcfa") {
                         { name: "Password", value: `||${item.password}||` }
                     )
             ]
-        }).catch(() => {});
+        });
 
         return msg.reply(`Sent to <@${target.id}>`);
     }
 });
 
+
+// ============================
 // BUTTON HANDLER
+// ============================
+
 client.on("interactionCreate", async interaction => {
     if (!interaction.isButton()) return;
 
+    // USER PRESSES "GET MCFA"
     if (interaction.customId === "get_mcfa") {
         const userId = interaction.user.id;
 
-        // BUTTON COOLDOWN – 10s
-        if (buttonCooldown.has(userId)) {
-            return interaction.reply({ content: "⌛ Wait 10 seconds before trying again.", ephemeral: true });
-        }
+        if (buttonCooldown.has(userId))
+            return interaction.reply({ content: "⌛ Wait 10 seconds.", ephemeral: true });
+
         buttonCooldown.set(userId, Date.now());
         setTimeout(() => buttonCooldown.delete(userId), 10000);
 
@@ -296,25 +293,116 @@ client.on("interactionCreate", async interaction => {
         const max = getMaxClaims(invites);
 
         if (invites < REQUIRED_INVITES)
-            return interaction.editReply({ content: `❌ Not enough invites. You have ${invites} invites.` });
+            return interaction.editReply(`❌ Not enough invites.`);
 
         if (claim >= max)
-            return interaction.editReply({ content: "❌ You've used all your invites." });
+            return interaction.editReply("❌ You used all your invites.");
 
         const dm = await user.createDM().catch(() => {});
-        if (!dm) return interaction.editReply("❌ Enable DMs to claim your MCFA.");
-
-        await interaction.editReply("📩 Check your DMs for the next step.");
+        if (!dm) return interaction.editReply("❌ Enable DMs.");
 
         await dm.send({
             embeds: [
                 new EmbedBuilder()
                     .setColor(0x5865f2)
                     .setTitle("📸 Upload Screenshot")
-                    .setDescription("Upload your YouTube subscription screenshot here.\nStaff will verify and send your MCFA.")
+                    .setDescription("Upload your YouTube subscription screenshot here.")
             ]
         });
+
+        return interaction.editReply("📩 Check your DM.");
     }
 });
 
+
+// ============================
+// DM SCREENSHOT HANDLER
+// ============================
+
+client.on("messageCreate", async msg => {
+    if (msg.guild) return;
+    if (msg.author.bot) return;
+
+    if (!msg.attachments.first()) return;
+
+    const user = msg.author;
+
+    const approvalChannel = await client.channels.fetch(SCREENSHOT_APPROVAL_CHANNEL);
+
+    const screenshot = msg.attachments.first().url;
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`approve_${user.id}`)
+            .setLabel("✅ Approve")
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId(`deny_${user.id}`)
+            .setLabel("❌ Deny")
+            .setStyle(ButtonStyle.Danger)
+    );
+
+    await approvalChannel.send({
+        embeds: [
+            new EmbedBuilder()
+                .setColor(0xffff00)
+                .setTitle("📸 Screenshot Approval Needed")
+                .setDescription(`User: <@${user.id}>`)
+                .setImage(screenshot)
+                .setTimestamp()
+        ],
+        components: [row]
+    });
+
+    await msg.reply("📤 Screenshot sent to staff. Wait for approval.");
+});
+
+
+// ============================
+// STAFF APPROVAL HANDLER
+// ============================
+
+client.on("interactionCreate", async interaction => {
+    if (!interaction.isButton()) return;
+
+    const [action, userId] = interaction.customId.split("_");
+    if (!["approve", "deny"].includes(action)) return;
+
+    const user = await client.users.fetch(userId);
+
+    const data = loadStock();
+
+    if (action === "deny") {
+        await user.send("❌ Your screenshot was denied. Upload again.");
+        return interaction.reply({ content: "❌ Denied.", ephemeral: true });
+    }
+
+    // APPROVED
+    const item = data.stock.find(i => !i.takenBy);
+    if (!item) {
+        await user.send("❌ No MCFA stock left.");
+        return interaction.reply({ content: "❌ No stock left.", ephemeral: true });
+    }
+
+    item.takenBy = userId;
+    saveStock(data);
+    await logToStock(item);
+
+    await user.send({
+        embeds: [
+            new EmbedBuilder()
+                .setColor(0x00ff00)
+                .setTitle("🎉 MCFA Approved!")
+                .addFields(
+                    { name: "Email", value: `||${item.email}||` },
+                    { name: "Password", value: `||${item.password}||` }
+                )
+        ]
+    });
+
+    await interaction.reply({ content: "✅ Approved & sent.", ephemeral: true });
+});
+
+
+// LOGIN
 client.login(TOKEN);
